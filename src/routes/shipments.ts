@@ -69,14 +69,30 @@ shipmentRouter.put('/:id', async (req: Request, res: Response) => {
   const id = req?.params?.id
 
   try {
-    const updatedShipment = req.body as Shipment
-    const query = { _id: new ObjectId(id) }
+    const { postOffice, type, status, weight } = req.body
+    const officeQuery = { zipCode: req.body.postOffice }
+    const checkBeforeInsert = await collections.offices?.count(officeQuery)
 
-    const result = await collections.shipments?.updateOne(query, { $set: updatedShipment })
+    if (checkBeforeInsert === 0) {
+      res.status(400).send(`There is no office available with code ${req.body.postOffice}`)
+    } else {
+      if (!typeOptions[type] || !statusOptions[status] || !weightOptions[weight]) {
+        res.status(400).send('Please check again your request')
+      } else {
+        const updatedShipment = new Shipment(
+          postOffice,
+          typeOptions[type],
+          statusOptions[status],
+          weightOptions[weight]
+        )
+        const query = { _id: new ObjectId(id) }
 
-    result
-      ? res.status(200).send(result)
-      : res.status(304).send(`Failed updating the shipment with id: ${id}`)
+        const result = await collections.shipments?.updateOne(query, { $set: updatedShipment })
+        result
+          ? res.status(200).send(result)
+          : res.status(304).send(`Failed updating the shipment with id: ${id}`)
+      }
+    }
   } catch (err) {
     const message = (err instanceof Error) ? err.message : String(err)
     res.status(400).send(message)
